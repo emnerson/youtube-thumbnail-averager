@@ -9,7 +9,7 @@ import sys
 import shutil
 
 # channel ids go here with UU instead of UC and you can set the max videos you want it to download by putting a number after the comma.
-IDS_AND_MAX_VIDEOS = [("UUKqH_9mk1waLgBiL2vT5b9g", 3000),("UU4rqhyiTs7XyuODcECvuiiQ", 3000)]
+IDS_AND_MAX_VIDEOS = [("UC4STm5KlYBHfn_bA6bjsYjQ", 3000)
 
 # wait time in between channels to avoid yt rate limit (kinda redundant so u can keep it at 0)
 SLEEP_TIME = 0
