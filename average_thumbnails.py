@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+import argparse
 import yt_dlp
 from PIL import Image
 import numpy as np
@@ -9,6 +12,7 @@ import sys
 import shutil
 
 # channel ids go here with UU instead of UC and you can set the max videos you want it to download by putting a number after the comma.
+#! DISREGARD! Use arguments to input the channels or use `--old` to use this!
 IDS_AND_MAX_VIDEOS = [("UUKqH_9mk1waLgBiL2vT5b9g", 3000),("UU4rqhyiTs7XyuODcECvuiiQ", 3000)]
 
 # wait time in between channels to avoid yt rate limit (kinda redundant so u can keep it at 0)
@@ -210,7 +214,7 @@ def main():
     print(" ")
     start_animation()
     print(" ")
-    print("˗ˏˋ SUBSCRIBE TO EMNERSON ˎˊ˗")
+    print("˗ˏˋ SUBSCRIBE TO EMNERSON ˎˊ˗") #! what about me >:(
     print("\n\n")
     time.sleep(1)
 
@@ -290,4 +294,21 @@ boneless chicken""")
         print(" ")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser("./average_thumbnails.py")
+    parser.epilog = "yt average thumbnail averager by emnerson & contributors <3"
+    parser.add_argument("ids", nargs="*", help="The YouTube channel ID and max video number, with both arguments separated by a colon")
+    parser.add_argument("--old", help="Use the old way of inputting files (via the script file)", action="store_true")
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        exit()
+
+    args = parser.parse_args()
+
+    if not args.old:
+        if len(args.ids) == 0:
+            print("You forgot the IDs (somehow)! >:(")
+        
+        IDS_AND_MAX_VIDEOS = [["UU" + id[2:], int(max)] for id, max in map(lambda s: s.split(":"), args.ids)] #* hehe i even replace the UC with UU automagically :3c
+
     main()
