@@ -1,8 +1,4 @@
 numpy==2.3.3
 pillow==11.3.0
 requests==2.32.5
-<<<<<<< HEAD
 yt-dlp==2025.9.26
-=======
-yt-dlp==2025.9.26
->>>>>>> 3f90fff95fc8dace6d72bb7453f4d82570864247
