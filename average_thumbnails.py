@@ -316,6 +316,15 @@ def main():
         choices=[True, False],
     )
 
+    parser.add_argument(
+        '--delete-thumbnails',
+        help='If the individual thumbnails should be deleted after the blends are done',
+        type=bool,
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        choices=[True, False],
+    )
+
     args = parser.parse_args()
 
     urls: list[tuple[str, str]] = []
@@ -377,6 +386,11 @@ def main():
         if video_thumbnails:
             print(" ")
             generate_blended_thumbnails(args, playlist_folder, video_thumbnails)
+            if args.delete_thumbnails:
+                print("  ✩ deleting individual thumbnails...")
+                for thumb in thumbnail_folder.iterdir():
+                    thumb.unlink()
+                thumbnail_folder.rmdir()
             print(" ")
             print(f"♡ {idx + 1} done!")
             print(" ")
