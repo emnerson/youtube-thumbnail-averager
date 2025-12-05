@@ -1,4 +1,5 @@
 import argparse
+import multiprocessing
 import re
 import sys
 import textwrap
@@ -42,59 +43,83 @@ def download_playlist_video_ids(playlist_url: str, max_videos: int, yt_dlp_opts:
             return []
 
 
-def download_video_thumbnails(video_ids: list[str], max_videos: int, thumbnail_folder: Path, yt_dlp_opts: dict) -> list[Image.Image]:
-    thumbnails: list[Image.Image] = []
+def download_video_thumbnail(video_id: str, max_videos: int, thumbnail_folder: Path, yt_dlp_opts: dict):
 
-    with YoutubeDL(yt_dlp_opts) as ydl:
-        for video_id in video_ids:
-            if len(thumbnails) >= max_videos:
-                break
-
+    try:
+        thumbnail_path = thumbnail_folder / f"{video_id}.png"
+        if thumbnail_path.exists():
             try:
-                thumbnail_path = thumbnail_folder / f'{video_id}.png'
-
-                if thumbnail_path.exists():
-                    try:
-                        thumbnail_image = Image.open(thumbnail_path)
-                        thumbnails.append(thumbnail_image)
-                        print(f"  ✔  [{len(thumbnails)}/{max_videos}] {video_id} (already downloaded)")
-                        continue
-                    except Exception as e:
-                        print(f'(╥‸╥) failed to open image from file {thumbnail_path}, falling back to download: {e}')
-
-                video = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-
-                width = video.get("width")
-                height = video.get("height")
-                aspect_ratio = width / height if width and height else None
-
-                def print_skip_reason(reason: str):
-                    print(f"  ✘  skipped {reason} {video['title']}")
-
-                if aspect_ratio is not None and aspect_ratio < 1:
-                    print_skip_reason("for being a short!! (ew)")
-                    continue
-                elif video.get("is_live", False) or video.get("was_live", False):
-                    print_skip_reason("for being a livestream!!")
-                    continue
-
-                thumbs = video.get('thumbnails')
-                thumbs.sort(key=lambda thumb: thumb.get('preference', -9999), reverse=True)
-
-                thumbnail_image = try_download_thumbnails(thumbs, video_id)
-
-                if thumbnail_image is None:
-                    print(f"(╥‸╥) skipping video, could not download thumbnail </3 id:{video_id}")
-                    continue
-
-                thumbnails.append(thumbnail_image)
-                thumbnail_image.save(thumbnail_path)
-
-                print(f"  ✔  [{len(thumbnails)}/{max_videos}] {video['title']}")
+                thumbnail_image = Image.open(thumbnail_path)
+                print(f"  ✔ {video_id} (already downloaded)")
+                return thumbnail_image
             except Exception as e:
-                print(f"(╥‸╥) skipping video and pausing for 500 seconds </3 id:{video_id}")
-                print(e)
-                # time.sleep(500)
+                print(f"(╥‸╥) failed to open image from file {thumbnail_path}, falling back to download: {e}")
+
+        # Create YoutubeDL inside the worker process to avoid passing a non-picklable YoutubeDL instance (which contains TextIOWrapper) to multiprocessing.
+        with YoutubeDL(yt_dlp_opts) as ydl:
+            video = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+
+        width = video.get("width")
+        height = video.get("height")
+        aspect_ratio = width / height if width and height else None
+
+        def print_skip_reason(reason: str):
+            print(f"  ✘  skipped {reason} {video['title']}")
+
+        if aspect_ratio is not None and aspect_ratio < 1:
+            print_skip_reason("for being a short!! (ew)")
+            return
+        elif video.get("is_live", False) or video.get("was_live", False):
+            print_skip_reason("for being a livestream!!")
+            return
+
+        thumbs = video.get("thumbnails")
+        thumbs.sort(key=lambda thumb: thumb.get("preference", -9999), reverse=True)
+
+        thumbnail_image = try_download_thumbnails(thumbs, video_id)
+
+        if thumbnail_image is None:
+            print(f"(╥‸╥) skipping video, could not download thumbnail </3 id:{video_id}")
+            return
+
+        print(f"  ✔  {video['title']}")
+        return thumbnail_image
+    except Exception as e:
+        print(f"(╥‸╥) skipping video due to unknown error </3 id:{video_id}")
+        print(e)
+        # time.sleep(500)
+
+
+def download_video_thumbnails(
+    video_ids: list[str],
+    max_videos: int,
+    thumbnail_folder: Path,
+    yt_dlp_opts: dict,
+    use_multiprocessing: bool,
+) -> list[Image.Image]:
+    thumbnails: list[Image.Image] = []
+    if use_multiprocessing:
+        with multiprocessing.Pool() as pool:
+            thumbnails = [
+                thumbnail
+                for thumbnail in pool.starmap(
+                    download_video_thumbnail,
+                    [
+                        (video_id, max_videos, thumbnail_folder, yt_dlp_opts)
+                        for video_id in video_ids[:max_videos]
+                    ],
+                )
+                if thumbnail is not None
+            ]
+    else:
+        for video_id in video_ids[:max_videos]:
+            thumbnail = download_video_thumbnail(video_id, max_videos, thumbnail_folder, yt_dlp_opts)
+            if thumbnail is not None:
+                thumbnails.append(thumbnail)
+    for idx, thumbnail in enumerate(thumbnails):
+        if thumbnail:
+            vid = video_ids[idx]
+            thumbnail.save(thumbnail_folder / f"{vid}.png")
 
     print(" ")
 
@@ -316,6 +341,15 @@ def main():
         choices=[True, False],
     )
 
+    parser.add_argument(
+        '--multiprocessing', '-mp',
+        help='If multiprocessing should be used for downloading thumbnails',
+        type=bool,
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        choices=[True, False],
+    )
+
     args = parser.parse_args()
 
     urls: list[tuple[str, str]] = []
@@ -366,7 +400,7 @@ def main():
 
         video_ids = download_playlist_video_ids(playlist_url, max_videos, yt_dlp_opts)
 
-        video_thumbnails = download_video_thumbnails(video_ids, max_videos, thumbnail_folder, yt_dlp_opts)
+        video_thumbnails = download_video_thumbnails(video_ids, max_videos, thumbnail_folder, yt_dlp_opts, not args.multiprocessing)
 
         if not video_thumbnails:
             print(f"(╥‸╥) skipping {playlist_id}, evil scary error happened.")

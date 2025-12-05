@@ -23,3 +23,5 @@ requirements for those who don't feel like looking at the [req file](./requireme
 - requests
 
 remember, you can install this all automatically by running `pip3 install -r requirements.txt`.
+
+If you encounter issues possibly try with the -mp flag to disable multiprocessing (It shouldn't make a diffrence but your mileage may vary)
